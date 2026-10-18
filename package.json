@@ -1,0 +1,11 @@
+{
+  "name": "little-grades",
+  "version": "1.0.0",
+  "description": "A cute, simple grade tracker that tells you what you need on your next test. Works offline, no account.",
+  "private": true,
+  "scripts": {
+    "test": "node tests/engine.test.js",
+    "start": "python3 -m http.server 8000"
+  },
+  "license": "UNLICENSED"
+}
