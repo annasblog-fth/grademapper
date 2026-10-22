@@ -1,4 +1,4 @@
-/* Little Grades: speech tools, notes and doodle pad. */
+/* grademapper: speech tools, notes and doodle pad. */
 (function () {
   'use strict';
   const LG = window.LG;
@@ -14,10 +14,43 @@
   let transcript = '';
   let rec = null;
   let listening = false;
+  let panelView = null;       // the Speech tools screen, only while it is open
+  let ttsOn = false;
+  const SP = (LG.tools.speech = { _fn: [], on(fn) { SP._fn.push(fn); }, off(fn) { SP._fn = SP._fn.filter((f) => f !== fn); }, listening: () => listening, speaking: () => ttsOn });
+  const spEmit = () => SP._fn.slice().forEach((f) => f());
 
   function stopRec() {
     if (rec) { try { rec.onend = null; rec.stop(); } catch (e) { /* ignore */ } }
-    rec = null; listening = false;
+    rec = null; const was = listening; listening = false;
+    if (was) { if (panelView) panelView.paint('Stopped.'); spEmit(); }
+  }
+  SP.stopRecording = stopRec;
+  SP.stopReading = () => { if (window.speechSynthesis) window.speechSynthesis.cancel(); ttsOn = false; spEmit(); };
+
+  /** Start listening. Works with or without the Speech tools screen open, so recording carries on while the person uses other pages. */
+  function startRec(lang) {
+    rec = new SR();
+    rec.lang = lang;
+    rec.continuous = true; rec.interimResults = true;
+    let base = transcript ? transcript.replace(/\s*$/, ' ') : '';
+    rec.onresult = (e) => {
+      let fin = '', interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i];
+        if (r.isFinal) fin += r[0].transcript; else interim += r[0].transcript;
+      }
+      base += fin;
+      transcript = base + interim;
+      if (panelView) panelView.showText(transcript);
+    };
+    rec.onerror = (e) => {
+      const msg = e.error === 'not-allowed' || e.error === 'service-not-allowed' ? 'Microphone is blocked. Allow it in your browser settings and try again.' : e.error === 'no-speech' ? 'I did not hear anything. Try again closer to the sound.' : e.error === 'network' ? 'Speech to text needs a connection in this browser.' : 'Recording stopped (' + e.error + ').';
+      if (panelView) panelView.paint(msg);
+      if (e.error !== 'no-speech') { listening = false; spEmit(); if (panelView) panelView.paintBtn(); }
+    };
+    // Browsers end long sessions on their own, so quietly start again until the person presses stop.
+    rec.onend = () => { if (listening) { try { rec.start(); } catch (err) { listening = false; spEmit(); if (panelView) panelView.paintBtn(); } } };
+    try { rec.start(); listening = true; spEmit(); return true; } catch (err) { rec = null; return false; }
   }
 
   views.speech = {
@@ -32,7 +65,7 @@
           '<p class="muted" id="sr-status" aria-live="polite"></p>' +
           '<div class="field"><label class="lbl" for="sr-text">Transcript</label><textarea class="in" id="sr-text" rows="9" placeholder="Your words will appear here. You can fix mistakes by typing."></textarea></div>' +
           '<div class="row-wrap"><button type="button" class="btn" id="sr-save">Save as note</button><button type="button" class="btn" id="sr-copy">Copy</button><button type="button" class="btn quiet" id="sr-clear">Clear</button></div>' +
-          '<p class="hint">Privacy note: in many browsers (Chrome, Edge, Safari) the browser itself sends your voice to its maker\'s servers to turn it into text. Little Grades never sees or stores the audio. Skip this tool if that is not okay for your class.</p>'
+          '<p class="hint">Privacy note: in many browsers (Chrome, Edge, Safari) the browser itself sends your voice to its maker\'s servers to turn it into text. grademapper never sees or stores the audio. Skip this tool if that is not okay for your class.</p>'
           : '<p>Speech to text is not available in this browser. Try Chrome, Edge or Safari on your phone or computer.</p>') + '</section>' +
 
         '<section class="card tool" aria-labelledby="tts-h"><h2 id="tts-h">Read text aloud</h2>' +
@@ -48,32 +81,17 @@
         ta.value = transcript;
         ta.addEventListener('input', () => { transcript = ta.value; });
         const paintBtn = () => { go.innerHTML = listening ? u.icon('stop') + ' Stop recording' : u.icon('mic') + ' Start recording'; go.classList.toggle('rec', listening); };
+        panelView = {
+          paint: (msg) => { st.textContent = msg; },
+          paintBtn,
+          showText: (t) => { ta.value = t; ta.scrollTop = ta.scrollHeight; },
+        };
         paintBtn();
         if (listening) st.textContent = 'Listening...';
         go.addEventListener('click', () => {
           if (listening) { stopRec(); paintBtn(); st.textContent = 'Stopped.'; return; }
-          rec = new SR();
-          rec.lang = u.$('#sr-lang', el).value;
-          rec.continuous = true; rec.interimResults = true;
-          let base = ta.value ? ta.value.replace(/\s*$/, ' ') : '';
-          rec.onresult = (e) => {
-            let fin = '', interim = '';
-            for (let i = e.resultIndex; i < e.results.length; i++) {
-              const r = e.results[i];
-              if (r.isFinal) fin += r[0].transcript; else interim += r[0].transcript;
-            }
-            base += fin;
-            ta.value = base + interim; transcript = ta.value;
-            ta.scrollTop = ta.scrollHeight;
-          };
-          rec.onerror = (e) => {
-            const msg = e.error === 'not-allowed' || e.error === 'service-not-allowed' ? 'Microphone is blocked. Allow it in your browser settings and try again.' : e.error === 'no-speech' ? 'I did not hear anything. Try again closer to the sound.' : e.error === 'network' ? 'Speech to text needs a connection in this browser.' : 'Recording stopped (' + e.error + ').';
-            st.textContent = msg;
-            if (e.error !== 'no-speech') { listening = false; paintBtn(); }
-          };
-          // Browsers end long sessions on their own, so quietly start again until the person presses stop.
-          rec.onend = () => { if (listening) { try { rec.start(); } catch (err) { listening = false; paintBtn(); } } };
-          try { rec.start(); listening = true; st.textContent = 'Listening...'; paintBtn(); } catch (err) { st.textContent = 'Could not start the microphone.'; }
+          transcript = ta.value;
+          if (startRec(u.$('#sr-lang', el).value)) { st.textContent = 'Listening... you can close this panel and keep recording.'; paintBtn(); } else st.textContent = 'Could not start the microphone.';
         });
         u.$('#sr-save', el).addEventListener('click', () => {
           if (!ta.value.trim()) { ui.toast('Record something first.'); return; }
@@ -81,7 +99,7 @@
           ui.toast('Saved to Notes.');
         });
         u.$('#sr-copy', el).addEventListener('click', async () => ui.toast((await u.copy(ta.value)) ? 'Copied.' : 'Could not copy. Select the text and copy it by hand.'));
-        u.$('#sr-clear', el).addEventListener('click', () => { ta.value = ''; transcript = ''; });
+        u.$('#sr-clear', el).addEventListener('click', () => { ta.value = ''; transcript = ''; if (listening) { stopRec(); paintBtn(); st.textContent = 'Stopped.'; } });
       }
 
       if (window.speechSynthesis) {
@@ -103,12 +121,14 @@
           const v = voices()[Number(sel.value)];
           if (v) { ut.voice = v; ut.lang = v.lang; }
           ut.rate = Number(u.$('#tts-rate', el).value);
+          ut.onstart = () => { ttsOn = true; spEmit(); };
+          ut.onend = ut.onerror = () => { ttsOn = false; spEmit(); };
           window.speechSynthesis.speak(ut);
         });
-        u.$('#tts-stop', el).addEventListener('click', () => window.speechSynthesis.cancel());
+        u.$('#tts-stop', el).addEventListener('click', () => SP.stopReading());
       }
     },
-    leave() { stopRec(); if (window.speechSynthesis) window.speechSynthesis.cancel(); },
+    leave() { panelView = null; },  // recording and reading aloud carry on; the popup has their stop buttons
   };
 
   // ----------------------------------------------------------------- notes

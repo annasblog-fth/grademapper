@@ -1,4 +1,4 @@
-/* Little Grades: welcome flow (Pip sets up your profile), "how grades work", and the theme picker. */
+/* grademapper: welcome flow (Pip sets up your profile), "how grades work", and the theme picker. */
 (function () {
   'use strict';
   const LG = window.LG;
@@ -11,13 +11,6 @@
     'Grade 8', 'Grade 9', 'Grade 10', 'Grade 11', 'Grade 12',
     'College or university, year 1', 'College or university, year 2', 'College or university, year 3', 'College or university, year 4+',
     'Something else',
-  ];
-  const REGIONS = [
-    { id: 'us', title: 'US letters and GPA', ex: 'A, B+, and a 4.0 scale' },
-    { id: 'bc', title: 'Canada (BC)', ex: 'Percent and letters like A, B, C+' },
-    { id: 'uk', title: 'UK', ex: 'A* to U letters' },
-    { id: 'ib', title: 'IB', ex: 'Grades from 1 to 7' },
-    { id: 'custom', title: 'My own scale', ex: 'You set the letters and cut-offs in Settings' },
   ];
 
   // ---------------------------------------------------------- theme picker
@@ -69,7 +62,7 @@
 
       '<details class="card"><summary><h3>What do I need on my next test?</h3></summary>' +
       '<p>This is the question the app answers for you. Say you want 85%, you have 80% on the first 70% of the course, and the final is worth 30%. The score you need on the final is the one that pulls the weighted total up to 85%.</p>' +
-      '<p class="wa-out" id="need-demo"></p><p class="hint">Add a course and set a goal, and Little Grades does this for every upcoming test, even with several categories and drop-lowest rules.</p></details></div>';
+      '<p class="wa-out" id="need-demo"></p><p class="hint">Add a course and set a goal, and grademapper does this for every upcoming test, even with several categories and drop-lowest rules.</p></details></div>';
   }
   function bindLearn(root) {
     const scale = store.scale();
@@ -127,9 +120,8 @@
           html: '<fieldset class="choice-grid"><legend class="lbl">Grade or year</legend>' + GRADE_CHOICES.map((g, i) =>
             '<label class="choice"><input type="radio" name="w-grade" value="' + u.esc(g) + '"' + (p.grade === g ? ' checked' : '') + '><span>' + u.esc(g) + '</span></label>').join('') + '</fieldset>' };
       case 'scale':
-        return { say: 'Schools give out grades in different ways. Which one is closest to yours?', mood: 'think',
-          html: '<fieldset class="choice-list"><legend class="lbl">Grading style</legend>' + REGIONS.map((r) =>
-            '<label class="choice wide"><input type="radio" name="w-region" value="' + r.id + '"' + (p.region === r.id ? ' checked' : '') + '><span><strong>' + u.esc(r.title) + '</strong><small>' + u.esc(r.ex) + '</small></span></label>').join('') + '</fieldset>' +
+        return { say: 'Schools give out grades in different ways. First tell me your country, then pick the grading style closest to yours.', mood: 'think',
+          html: countryHTML(p) + '<div id="sc-scale-box">' + scaleHTML(p) + '</div>' +
             '<p class="hint">You can change this any time, and edit the exact cut-offs in Settings.</p>' };
       case 'goals':
         return { say: 'Goals make things less foggy. What average would feel great this year? If you have colleges in mind, add them too. Both are optional.', mood: 'happy',
@@ -157,13 +149,30 @@
           html: '<div class="theme-grid" id="w-themes"></div>' +
             '<fieldset class="seg-wrap"><legend class="lbl">Light or dark</legend><div class="seg" id="w-mode">' +
             [['auto', 'Match my phone'], ['light', 'Light'], ['dark', 'Dark']].map((m) => '<button type="button" data-v="' + m[0] + '" aria-pressed="' + (store.appearance.mode === m[0]) + '">' + m[1] + '</button>').join('') + '</div>' +
-            '<p class="hint">Academic and Neon are dark themes, so this switch does nothing for them.</p></fieldset>' };
+            '<p class="hint">Academic, Neon and Avocado Smoothie are dark themes, so this switch does nothing for them.</p></fieldset>' };
       default:
         return { say: 'You\'re all set, ' + nm + '! Add a course and I\'ll show you where you stand. Remember: grades show what you have done so far, not what you can do.', mood: 'cheer',
           html: '<div class="stack"><button type="button" class="btn primary" id="w-first">' + u.icon('plus') + ' Add my first course</button>' +
             '<button type="button" class="btn" id="w-example">Try an example course first</button>' +
             '<a class="btn quiet" href="#/home" id="w-home">Go to home</a></div>' };
     }
+  }
+  // ---------------------------------------------------- country, then scale
+  const countryOf = (p) => (p.country && E.countryById(p.country)) || E.countryOfScale(p.region);
+  function countryHTML(p) {
+    const cur = countryOf(p).id;
+    return '<div id="sc-country-box"><fieldset class="choice-list"><legend class="lbl">1. Your country</legend>' +
+      '<div class="field"><label class="lbl sr-only" for="sc-q">Search countries</label><input class="in" type="search" id="sc-q" placeholder="Search countries" autocomplete="off"></div>' +
+      '<div class="country-list" id="sc-countries">' + E.COUNTRIES.map((c) =>
+        '<label class="choice wide" data-name="' + u.esc(c.name.toLowerCase()) + '"><input type="radio" name="w-country" value="' + c.id + '"' + (cur === c.id ? ' checked' : '') + '><span><strong>' + u.esc(c.name) + '</strong></span></label>').join('') + '</div>' +
+      '<p class="hint" id="sc-none" aria-live="polite" hidden>No country matches that. Try "Somewhere else" at the bottom.</p></fieldset></div>';
+  }
+  function scaleHTML(p) {
+    const c = countryOf(p);
+    const list = E.scalesOfCountry(c.id);
+    const cur = list.some((x) => x.id === p.region) ? p.region : list[0].id;
+    return '<fieldset class="choice-list"><legend class="lbl">2. Grading scale in ' + u.esc(c.name) + '</legend>' + list.map((r) =>
+      '<label class="choice wide"><input type="radio" name="w-region" value="' + r.id + '"' + (cur === r.id ? ' checked' : '') + '><span><strong>' + u.esc(r.label) + '</strong>' + (r.note ? '<small>' + u.esc(r.note) + '</small>' : '') + '</span></label>').join('') + '</fieldset>';
   }
   function collegeRows(p) {
     if (!p.colleges.length) return '<p class="muted" id="w-nocol">No colleges yet. That is okay.</p>';
@@ -183,7 +192,8 @@
       '<section class="wizard" aria-labelledby="wiz-h">' +
       '<h1 class="sr-only" id="wiz-h">Set up your profile</h1>' +
       '<div class="wiz-top"><p class="step-count">Step ' + (step + 1) + ' of ' + STEPS.length + '</p>' +
-      (last ? '' : '<button type="button" class="btn quiet small" id="w-skip">Skip setup</button>') + '</div>' +
+      '<span class="wiz-top-btns"><button type="button" class="btn quiet small" id="w-tips"">' + (tipsOff() ? 'Show tips' : 'Hide tips') + '</button>' +
+      (last ? '' : '<button type="button" class="btn quiet small" id="w-skip">Skip setup</button>') + '</span></div>' +
       '<div class="dots" aria-hidden="true">' + STEPS.map((s, i) => '<i class="' + (i < step ? 'done' : i === step ? 'now' : '') + '"></i>').join('') + '</div>' +
       ui.bubble(body.say, { mood: body.mood, cls: 'big' }) +
       '<div class="card wiz-card">' + body.html + '</div>' +
@@ -191,10 +201,11 @@
       (last ? '' : '<button type="button" class="btn primary" id="w-next">' + (step === STEPS.length - 2 ? 'Finish' : 'Next') + ' ' + u.icon('chev') + '</button>') + '</div></section>';
     ui.enhance(view);
 
-    const go = (n) => { step = Math.max(0, Math.min(STEPS.length - 1, n)); LG.app.rerender(true); };
+    const go = (n) => { step = Math.max(0, Math.min(STEPS.length - 1, n)); LG.app.rerender(false); };
     const el = (id) => u.$('#' + id, view);
     if (el('w-next')) el('w-next').addEventListener('click', () => go(step + 1));
     if (el('w-back')) el('w-back').addEventListener('click', () => go(step - 1));
+    el('w-tips').addEventListener('click', () => { setTipsOff(!tipsOff()); guideStop(); LG.app.rerender(); });
     if (el('w-skip')) el('w-skip').addEventListener('click', () => { finish(); location.hash = '#/home'; });
 
     if (name === 'hello') {
@@ -202,7 +213,28 @@
       el('w-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') go(step + 1); });
     }
     if (name === 'grade') u.$$('input[name="w-grade"]', view).forEach((r) => r.addEventListener('change', () => { p.grade = r.value; store.save(); }));
-    if (name === 'scale') u.$$('input[name="w-region"]', view).forEach((r) => r.addEventListener('change', () => { p.region = r.value; store.save(); }));
+    if (name === 'scale') {
+      const box = el('sc-scale-box');
+      // Make sure the scale shown as selected is really saved (a new profile starts with US letters).
+      const chosen = u.$('input[name="w-region"]:checked', view);
+      if (chosen) { p.region = chosen.value; p.country = countryOf(p).id; }
+      box.addEventListener('change', (e) => { if (e.target.name === 'w-region') { p.region = e.target.value; p.country = countryOf(p).id; store.save(); } });
+      el('sc-countries').addEventListener('change', (e) => {
+        if (e.target.name !== 'w-country') return;
+        const c = E.countryById(e.target.value);
+        p.country = c.id;
+        if (c.scales.indexOf(p.region) < 0) p.region = c.scales[0];
+        store.save();
+        box.innerHTML = scaleHTML(p);
+        view.dispatchEvent(new CustomEvent('wiz-country'));
+      });
+      el('sc-q').addEventListener('input', (e) => {
+        const q = e.target.value.trim().toLowerCase();
+        let shown = 0;
+        u.$$('#sc-countries .choice', view).forEach((l) => { const on = !q || l.dataset.name.indexOf(q) >= 0; l.hidden = !on; if (on) shown++; });
+        el('sc-none').hidden = shown > 0;
+      });
+    }
     if (name === 'goals') {
       el('w-goal').addEventListener('input', (e) => { p.goal = e.target.value; store.save(); });
       const box = el('w-colleges');
@@ -239,5 +271,85 @@
     }
   };
   W.restart = () => { step = 0; };
+  W.leave = () => guideStop();
+
+  // ---------------------------------------------------------------- guide
+  // Little animated tips that show where to read and where to tap, one after another. They never block taps
+  // (pointer-events: none) and can be hidden. With animations off, the same tips show without movement.
+  const tipsOff = () => { try { return localStorage.getItem('grademapper-tips') === 'off'; } catch (e) { return false; } };
+  const setTipsOff = (v) => { try { localStorage.setItem('grademapper-tips', v ? 'off' : 'on'); } catch (e) { /* ignore */ } };
+  const READ = { sel: '.bubble', text: 'Read what Pip says', place: 'below', ms: 3200 };
+  const GUIDES = {
+    hello: [READ, { sel: '#w-name', text: 'Type your name here', place: 'below', until: 'input' }],
+    grade: [READ, { sel: '.wiz-card', text: 'Tap your grade or year', place: 'above', until: 'change' }],
+    scale: [READ, { sel: '#sc-country-box', text: '1. Tap your country', place: 'above', until: 'wiz-country' }, { sel: '#sc-scale-box', text: '2. Tap your grading scale', place: 'above', until: 'change' }],
+    goals: [READ, { sel: '#w-goal', text: 'Type a goal (you can skip this)', place: 'below', until: 'input', ms: 7000 }],
+    needs: [READ],
+    learn: [READ, { sel: '.learn summary', text: 'Tap a card to open it', place: 'below', until: 'toggle', ms: 7000 }],
+    look: [READ, { sel: '#w-themes', text: 'Tap a look you like', place: 'above', until: 'click', ms: 8000 }],
+    done: [READ, { sel: '#w-first', text: 'Tap here to begin', place: 'above', until: 'never' }],
+  };
+  let guide = null;
+  function guideStop() {
+    if (!guide) return;
+    clearTimeout(guide.timer);
+    if (guide.ro) guide.ro.disconnect();
+    window.removeEventListener('resize', guide.place);
+    guide.listeners.forEach((l) => l[0].removeEventListener(l[1], l[2], true));
+    if (guide.glow) guide.glow.classList.remove('guide-glow');
+    if (guide.tip) guide.tip.remove();
+    guide = null;
+  }
+  function guideStart(view, name) {
+    guideStop();
+    if (tipsOff()) return;
+    const root = u.$('.wizard', view);
+    const list = (GUIDES[name] || []).slice();
+    if (name !== 'done') list.push({ sel: '#w-next', text: 'Then tap Next', place: 'above', until: 'never' });
+    if (!root || !list.length) return;
+    const g = (guide = { i: -1, tip: null, glow: null, timer: null, listeners: [], ro: null, place: null });
+    const on = (target, type, fn) => { target.addEventListener(type, fn, true); g.listeners.push([target, type, fn]); };
+    const step = () => {
+      if (guide !== g) return;
+      clearTimeout(g.timer);
+      g.i += 1;
+      const spec = list[g.i];
+      if (g.glow) g.glow.classList.remove('guide-glow');
+      if (g.tip) { g.tip.remove(); g.tip = null; }
+      g.listeners.forEach((l) => l[0].removeEventListener(l[1], l[2], true)); g.listeners = [];
+      if (!spec) return;
+      const target = u.$(spec.sel, root);
+      if (!target) { step(); return; }
+      g.glow = target; target.classList.add('guide-glow');
+      const tip = document.createElement('div');
+      tip.className = 'guide-tip'; tip.dataset.place = spec.place; tip.setAttribute('aria-hidden', 'true');
+      tip.innerHTML = '<span class="gt-text">' + u.esc(spec.text) + '</span><span class="gt-arrow"></span>';
+      root.appendChild(tip); g.tip = tip;
+      g.place = () => {
+        if (guide !== g || !g.tip) return;
+        const rr = root.getBoundingClientRect(), tr = target.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+        let left = tr.left - rr.left + Math.min(24, tr.width / 4);
+        left = Math.max(0, Math.min(left, rr.width - w));
+        const top = spec.place === 'above' ? tr.top - rr.top - h - 6 : tr.bottom - rr.top + 6;
+        tip.style.left = left + 'px'; tip.style.top = Math.max(0, top) + 'px';
+        tip.style.setProperty('--ax', Math.max(14, Math.min(w - 14, tr.left - rr.left + Math.min(24, tr.width / 4) - left)) + 'px');
+      };
+      g.place();
+      window.addEventListener('resize', g.place);
+      if (window.ResizeObserver) { if (g.ro) g.ro.disconnect(); g.ro = new ResizeObserver(g.place); g.ro.observe(root); }
+      const vis = target.getBoundingClientRect();
+      if (vis.bottom > window.innerHeight - 90 || vis.top < 0) { try { target.scrollIntoView({ block: 'center', behavior: LG.u.prefersReducedMotion() ? 'auto' : 'smooth' }); } catch (e) { /* ignore */ } }
+      if (spec.until && spec.until !== 'never') {
+        const next = () => setTimeout(step, 250);
+        if (spec.until === 'wiz-country') on(view, 'wiz-country', next);
+        else if (spec.until === 'click') on(target, 'click', next);
+        else on(root, spec.until, (e) => { if (!e.target.closest || !e.target.closest('.guide-tip')) next(); });
+      }
+      if (spec.ms) g.timer = setTimeout(step, spec.ms);
+    };
+    setTimeout(step, 400);
+  }
+  const baseRender = W.render;
+  W.render = (view, params) => { baseRender(view, params); guideStart(view, STEPS[step]); };
   W.title = 'Welcome';
 })();

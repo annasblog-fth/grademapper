@@ -1,4 +1,4 @@
-/* Little Grades: grades pages (terms, course list, trend chart, course editor). */
+/* grademapper: grades pages (terms, course list, trend chart, course editor). */
 (function () {
   'use strict';
   const LG = window.LG;
@@ -143,7 +143,9 @@
     const courses = s.courses.filter((c) => c.termId === term.id);
     const sum = E.cumulative(courses, scale, opts);
     const all = E.cumulative(s.courses, scale, opts);
-    const sums = E.termSummaries(s.terms, s.courses, scale, opts);
+    // Earlier years from the Archive come first in the trend. With an empty archive this is exactly the old list.
+    const sums = E.archivePeriods(s.archive, scale, opts).concat(E.termSummaries(s.terms, s.courses, scale, opts));
+    const allTime = s.archive.length ? E.cumulativeAll(s.courses, s.archive, scale, opts) : null;
     const goal = E.num(s.profile.goal);
     const hasPts = E.hasPoints(scale);
     const band = sum.percent === null ? null : E.bandFor(sum.percent, scale);
@@ -161,6 +163,9 @@
     }
     const cumLine = all.percent !== null && s.terms.length > 1
       ? '<p class="muted">All terms together: <strong>' + E.fmt(all.percent) + '%</strong>' + (hasPts && all.points !== null ? ' &middot; cumulative ' + u.esc(ptsLabel) + ' <strong>' + all.points.toFixed(2) + '</strong>' : '') + '</p>'
+      : '';
+    const archLine = allTime && allTime.percent !== null
+      ? '<p class="muted">With your archive: <strong>' + E.fmt(allTime.percent) + '%</strong>' + (hasPts && allTime.points !== null ? ' &middot; all-time ' + u.esc(ptsLabel) + ' <strong>' + allTime.points.toFixed(2) + '</strong>' : '') + ' <a href="#/archive">Open the archive</a></p>'
       : '';
     const weightedToggle = hasPts && scale.allowsBonus
       ? '<fieldset class="seg-wrap"><legend class="lbl">GPA type</legend><div class="seg" id="gpa-seg">' +
@@ -186,13 +191,13 @@
       : '<div class="empty"><p>No courses in <strong>' + u.esc(term.name) + '</strong> yet.</p><p class="muted">Add one to start tracking, or load an example to see how everything works.</p></div>';
 
     view.innerHTML =
-      '<h1 class="page-title">Grades</h1>' +
+      '<h1 class="page-title">Grades</h1>' + LG.pages.archive.switcher('current') +
       '<div class="term-bar"><div class="field"><label class="lbl" for="term-sel">Term</label><select class="in" id="term-sel">' +
       ui.options(s.terms.map((t) => ({ value: t.id, label: t.name })), term.id) + '</select></div>' +
       '<button type="button" class="icon-btn" data-act="term-add" aria-label="Add a term">' + u.icon('plus') + '</button>' +
       '<button type="button" class="icon-btn" data-act="term-rename" aria-label="Rename this term">' + u.icon('edit') + '</button>' +
       '<button type="button" class="icon-btn" data-act="term-del" aria-label="Delete this term">' + u.icon('trash') + '</button></div>' +
-      '<section class="card" aria-labelledby="sum-h"><h2 id="sum-h">' + u.esc(term.name) + ' so far</h2>' + summary + cumLine + weightedToggle + '</section>' +
+      '<section class="card" aria-labelledby="sum-h"><h2 id="sum-h">' + u.esc(term.name) + ' so far</h2>' + summary + cumLine + archLine + weightedToggle + '</section>' +
       (sums.length ? '<section class="card" aria-labelledby="trend-h"><h2 id="trend-h">Your trend</h2>' + trendChart(sums, goal) + '</section>' : '') +
       '<section aria-labelledby="courses-h" class="stack"><div class="row-between"><h2 id="courses-h">Courses</h2>' +
       '<button type="button" class="btn primary" data-act="course-add">' + u.icon('plus') + ' Add a course</button></div>' + courseCards +
@@ -322,7 +327,9 @@
         '<div><label class="lbl" for="cn-' + id + '">Category</label><input class="in" id="cn-' + id + '" data-f="name" value="' + u.esc(cat.name) + '" placeholder="e.g. Tests" autocomplete="off"></div>' +
         '<div><label class="lbl" for="cw-' + id + '">Worth %</label><input class="in num" id="cw-' + id + '" data-f="weight" inputmode="decimal" value="' + u.esc(cat.weight) + '" placeholder="20" autocomplete="off"></div>' +
         '<div><label class="lbl" for="cd-' + id + '">Drop low</label><input class="in num" id="cd-' + id + '" data-f="dropLowest" inputmode="numeric" value="' + u.esc(cat.dropLowest) + '" placeholder="0" autocomplete="off"></div>' +
+        '<div><label class="lbl" for="cl-' + id + '">To come</label><input class="in num" id="cl-' + id + '" data-up="1" inputmode="numeric" value="' + cat.entries.filter((x) => E.isUpcoming(x)).length + '" placeholder="0" autocomplete="off" aria-describedby="cl-h-' + id + '"></div>' +
       '</div>' +
+      '<p class="hint" id="cl-h-' + id + '">To come = how many scores are still to come in this category (for example 3 tests left). I use it to work out what you need on each.</p>' +
       '<p class="avg">Average so far: <strong id="avg-' + id + '">&ndash;</strong></p>' +
       '<div class="entry-cols" aria-hidden="true"><span>Item</span><span>Score</span><span>Out of</span><span></span></div>' +
       '<ul class="entries">' + cat.entries.map(entryHTML).join('') + '</ul>' +
@@ -374,7 +381,9 @@
       '<div class="field"><label class="lbl" for="cs-credits">Credits</label><input class="in num" id="cs-credits" inputmode="decimal" value="' + u.esc(course.credits) + '"></div>' +
       '<div class="field"><label class="lbl" for="cs-term">Term</label><select class="in" id="cs-term">' + ui.options(s.terms.map((t) => ({ value: t.id, label: t.name })), course.termId) + '</select></div></div>' +
       '<p class="hint">Credits count how much this course weighs in your GPA. A full-year course is usually 1, a semester course 0.5.</p>' +
-      '<button type="button" class="btn danger" id="del-course">' + u.icon('trash') + ' Delete this course</button></details>';
+      '<div class="row-wrap"><button type="button" class="btn" id="arch-course">' + u.icon('download') + ' Move to archive</button>' +
+      '<button type="button" class="btn danger" id="del-course">' + u.icon('trash') + ' Delete this course</button></div>' +
+      '<p class="hint">Move to archive keeps the final grade for your all-time average and takes the course off your current list. You can move it back from the Archive.</p></details>';
 
     function renderEditor() {
       const box = u.$('#cats', view);
@@ -467,7 +476,11 @@
           u.$('[data-f="max"]', row).setAttribute('aria-label', 'Out of, for ' + nm);
           u.$('[data-act="del-entry"]', row).setAttribute('aria-label', 'Remove ' + nm);
         }
-        if (f === 'score' || f === 'max') u.$('.entry-due', row).hidden = !E.isUpcoming(en);
+        if (f === 'score' || f === 'max') {
+          u.$('.entry-due', row).hidden = !E.isUpcoming(en);
+          if (f === 'score') delete en.placeholder;   // once you type a score it is a real score
+          const up = u.$('[data-up]', t.closest('[data-cat-id]')); if (up && document.activeElement !== up) up.value = cat.entries.filter((x) => E.isUpcoming(x)).length;
+        }
         if (f === 'due' && t.value && en.remind === undefined) {
           en.remind = '1440';
           u.$('[data-f="remind"]', row).value = '1440';
@@ -482,6 +495,22 @@
     });
     // Celebrate when a score is committed (not on every keystroke, which would steal focus mid-typing).
     cats.addEventListener('change', (ev) => {
+      if (ev.target.dataset.up) {
+        const cat = findCat(ev.target);
+        const want = Math.max(0, Math.min(60, Math.floor(E.num(ev.target.value) || 0)));
+        if (!cat) return;
+        const blanks = cat.entries.filter((x) => E.isUpcoming(x));
+        if (want > blanks.length) {
+          for (let i = blanks.length; i < want; i++) cat.entries.push(newEntry({ name: (cat.name ? cat.name.replace(/s$/, '') : 'Upcoming') + ' ' + (cat.entries.length + 1), placeholder: true }));
+        } else if (want < blanks.length) {
+          // Remove only the empty ones I added. Anything you named or dated stays.
+          let drop = blanks.length - want;
+          for (let i = cat.entries.length - 1; i >= 0 && drop > 0; i--) { const x = cat.entries[i]; if (x.placeholder && E.isUpcoming(x) && !x.due) { cat.entries.splice(i, 1); drop--; } }
+          if (drop > 0) ui.toast('The rest are items you named or dated. Remove those with the x button.');
+        }
+        store.save(); renderEditor(); update();
+        return;
+      }
       const f = ev.target.dataset.f;
       if (f === 'score' || f === 'max') G.evaluateGoal(course, true);
     });
@@ -544,6 +573,17 @@
         store.save();
         if (k !== 'credits') LG.app.rerender();
       });
+    });
+    u.$('#arch-course', view).addEventListener('click', async () => {
+      const ok = await ui.confirm({ title: 'Move ' + (course.name || 'this course') + ' to the archive?', body: 'It leaves your current courses and counts in your all-time average. You can move it back later.', confirmLabel: 'Move to archive' });
+      if (!ok) return;
+      const A = LG.pages.archive;
+      const done = A.archiveCourse(course);
+      location.hash = '#/archive';
+      ui.toast('Moved ' + (course.name || 'the course') + ' to the archive.', { actionLabel: 'Undo', onAction: () => {
+        const ai = s.archive.indexOf(done.rec); if (ai >= 0) s.archive.splice(ai, 1);
+        s.courses.splice(Math.min(done.idx, s.courses.length), 0, course); store.save(); location.hash = '#/grades/' + course.id;
+      } });
     });
     u.$('#del-course', view).addEventListener('click', async () => {
       const ok = await ui.confirm({ title: 'Delete ' + course.name + '?', body: 'Its categories and scores will be removed. You can undo right after.', confirmLabel: 'Delete course', danger: true });

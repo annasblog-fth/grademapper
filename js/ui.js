@@ -1,4 +1,4 @@
-/* Little Grades: shared UI pieces (toast, dialogs, Pip the mascot, speech bubbles, meter, confetti). */
+/* grademapper: shared UI pieces (toast, dialogs, Pip the mascot, speech bubbles, meter, confetti). */
 (function () {
   'use strict';
   const LG = window.LG;

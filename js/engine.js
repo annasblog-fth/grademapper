@@ -1,5 +1,5 @@
 /*
- * Little Grades: calculation engine
+ * grademapper: calculation engine
  *
  * Pure functions only. No screens, no storage, no browser code.
  * The same file runs in Node (for the tests) and in the page.
@@ -111,6 +111,61 @@
       ],
     },
   };
+
+  // More scales, by country (added in version 2). The four above keep their ids and numbers exactly as before.
+  // These are common school or national cut-offs and are marked approximate: schools and exam boards differ.
+  const APPROX = 'Approximate. Schools and exam boards differ, so check yours and use a custom scale if it is different.';
+  const mk = (id, label, bands, extra) => { SCALES[id] = Object.assign({ id, label, pointsLabel: '', note: APPROX, bands: bands.map((b) => Object.assign({ min: b[0], letter: b[1] }, b[2] != null ? { points: b[2] } : {})) }, extra || {}); };
+  mk('us-plain', 'US letters without plus or minus (4.0 GPA)', [[90, 'A', 4], [80, 'B', 3], [70, 'C', 2], [60, 'D', 1], [0, 'F', 0]], { pointsLabel: 'GPA', allowsBonus: true });
+  mk('ca-letter', 'Canada (letters with a 4.0 GPA)', [[90, 'A+', 4], [85, 'A', 4], [80, 'A-', 3.7], [77, 'B+', 3.3], [73, 'B', 3], [70, 'B-', 2.7], [67, 'C+', 2.3], [63, 'C', 2], [60, 'C-', 1.7], [57, 'D+', 1.3], [53, 'D', 1], [50, 'D-', 0.7], [0, 'F', 0]], { pointsLabel: 'GPA' });
+  mk('ca-on', 'Canada (Ontario levels 1 to 4)', [[80, 'Level 4'], [70, 'Level 3'], [60, 'Level 2'], [50, 'Level 1'], [0, 'Below 50']]);
+  mk('uk-gcse', 'UK (GCSE 9 to 1)', [[85, '9', 9], [77, '8', 8], [69, '7', 7], [60, '6', 6], [52, '5', 5], [44, '4', 4], [35, '3', 3], [25, '2', 2], [15, '1', 1], [0, 'U', 0]], { pointsLabel: 'Grade' });
+  mk('uk-degree', 'UK (university degree classes)', [[70, 'First'], [60, '2:1'], [50, '2:2'], [40, 'Third'], [0, 'Fail']]);
+  mk('ie', 'Ireland (Leaving Cert, Higher level)', [[90, 'H1', 100], [80, 'H2', 88], [70, 'H3', 77], [60, 'H4', 66], [50, 'H5', 56], [40, 'H6', 46], [30, 'H7', 37], [0, 'H8', 0]], { pointsLabel: 'CAO points' });
+  mk('au', 'Australia (university grades, 7-point GPA)', [[85, 'HD', 7], [75, 'D', 6], [65, 'C', 5], [50, 'P', 4], [0, 'N', 0]], { pointsLabel: 'GPA' });
+  mk('in-cbse', 'India (CBSE grades, 10-point)', [[91, 'A1', 10], [81, 'A2', 9], [71, 'B1', 8], [61, 'B2', 7], [51, 'C1', 6], [41, 'C2', 5], [33, 'D', 4], [0, 'E', 0]], { pointsLabel: 'Grade points' });
+  mk('sg', 'Singapore (O-Level A1 to F9)', [[75, 'A1'], [70, 'A2'], [65, 'B3'], [60, 'B4'], [55, 'C5'], [50, 'C6'], [45, 'D7'], [40, 'E8'], [0, 'F9']]);
+  mk('za', 'South Africa (achievement levels 1 to 7)', [[80, '7', 7], [70, '6', 6], [60, '5', 5], [50, '4', 4], [40, '3', 3], [30, '2', 2], [0, '1', 1]], { pointsLabel: 'Level' });
+  mk('ng', 'Nigeria (WAEC A1 to F9)', [[75, 'A1'], [70, 'B2'], [65, 'B3'], [60, 'C4'], [55, 'C5'], [50, 'C6'], [45, 'D7'], [40, 'E8'], [0, 'F9']]);
+  mk('de', 'Germany (grades 1 to 6)', [[92, '1'], [81, '2'], [67, '3'], [50, '4'], [30, '5'], [0, '6']]);
+  mk('fr', 'France (mentions, from a mark out of 20)', [[80, 'Tres bien'], [70, 'Bien'], [60, 'Assez bien'], [50, 'Passable'], [0, 'Insuffisant']]);
+  mk('es', 'Spain (0 to 10 words)', [[90, 'Sobresaliente'], [70, 'Notable'], [60, 'Bien'], [50, 'Suficiente'], [0, 'Insuficiente']]);
+  mk('cn', 'China (four levels)', [[90, 'Excellent'], [80, 'Good'], [70, 'Medium'], [60, 'Pass'], [0, 'Fail']]);
+  mk('jp', 'Japan (S to F, 4-point)', [[90, 'S', 4], [80, 'A', 3], [70, 'B', 2], [60, 'C', 1], [0, 'F', 0]], { pointsLabel: 'GPA' });
+  mk('kr', 'South Korea (A+ to F, 4.5 GPA)', [[95, 'A+', 4.5], [90, 'A0', 4], [85, 'B+', 3.5], [80, 'B0', 3], [75, 'C+', 2.5], [70, 'C0', 2], [65, 'D+', 1.5], [60, 'D0', 1], [0, 'F', 0]], { pointsLabel: 'GPA' });
+
+  // Countries: pick a country first, then one of its scales. Every scale is listed under exactly one country.
+  const COUNTRIES = [
+    { id: 'us', name: 'United States', scales: ['us', 'us-plain'] },
+    { id: 'ca', name: 'Canada', scales: ['bc', 'ca-letter', 'ca-on'] },
+    { id: 'uk', name: 'United Kingdom', scales: ['uk', 'uk-gcse', 'uk-degree'] },
+    { id: 'ie', name: 'Ireland', scales: ['ie'] },
+    { id: 'au', name: 'Australia', scales: ['au'] },
+    { id: 'in', name: 'India', scales: ['in-cbse'] },
+    { id: 'sg', name: 'Singapore', scales: ['sg'] },
+    { id: 'za', name: 'South Africa', scales: ['za'] },
+    { id: 'ng', name: 'Nigeria', scales: ['ng'] },
+    { id: 'de', name: 'Germany', scales: ['de'] },
+    { id: 'fr', name: 'France', scales: ['fr'] },
+    { id: 'es', name: 'Spain', scales: ['es'] },
+    { id: 'cn', name: 'China', scales: ['cn'] },
+    { id: 'jp', name: 'Japan', scales: ['jp'] },
+    { id: 'kr', name: 'South Korea', scales: ['kr'] },
+    { id: 'intl', name: 'International schools (IB)', scales: ['ib'] },
+    { id: 'other', name: 'Somewhere else, or my own scale', scales: ['custom'] },
+  ];
+  const countryById = (id) => COUNTRIES.filter((c) => c.id === id)[0] || null;
+  /** The country a scale id belongs to ('other' for custom and for anything unknown). */
+  function countryOfScale(scaleId) {
+    for (const c of COUNTRIES) if (c.scales.indexOf(scaleId) >= 0) return c;
+    return countryById('other');
+  }
+  /** Scales to offer for a country, as { id, label, note }. 'custom' is described by the person's own settings. */
+  function scalesOfCountry(countryId) {
+    const c = countryById(countryId);
+    if (!c) return [];
+    return c.scales.map((id) => (id === 'custom' ? { id, label: 'My own scale (set it up in Settings)', note: '' } : { id, label: SCALES[id].label, note: SCALES[id].note || '' }));
+  }
 
   /** Clean up a list of custom bands: numbers only, sorted high to low, always ends at 0. */
   function normalizeBands(bands) {
@@ -300,6 +355,92 @@
     });
   }
 
+  // ------------------------------------------------------------- archive
+  // Earlier classes and grades the person adds by hand (version 2). The functions above never look at these.
+  //   class   = { id, kind: 'class', name, subject, level, credits, period, when, percent, letter, note }
+  //   summary = { id, kind: 'summary', label, period, when, gpa, percent, credits, note }
+
+  /** The percent for an archived class: the typed percent, or the middle of the typed letter's band. Null if neither. */
+  function archivePercent(rec, scale) {
+    const p = num(rec && rec.percent);
+    if (p !== null) return Math.max(0, p);
+    const letter = String((rec && rec.letter) || '').trim().toLowerCase();
+    if (!letter) return null;
+    const bands = scale.bands;
+    for (let i = 0; i < bands.length; i++) {
+      if (String(bands[i].letter).toLowerCase() === letter) {
+        const top = i === 0 ? 100 : bands[i - 1].min;
+        return (bands[i].min + top) / 2;
+      }
+    }
+    return null;
+  }
+
+  /** [{ pct, pts, cr }] for each archive record that has something to count. */
+  function archiveRows(archive, scale, opts) {
+    const rows = [];
+    for (const rec of archive || []) {
+      if (!rec) continue;
+      if (rec.kind === 'summary') {
+        const pct = num(rec.percent);
+        const gpa = num(rec.gpa);
+        if (pct === null && gpa === null) continue;
+        const cr = num(rec.credits);
+        rows.push({ pct, pts: gpa, cr: cr !== null && cr > 0 ? cr : 1, rec });
+      } else {
+        const pct = archivePercent(rec, scale);
+        if (pct === null) continue;
+        const cr = creditsOf(rec);
+        if (cr <= 0) continue;
+        rows.push({ pct, pts: pointsFor(pct, scale, Object.assign({}, opts, { level: rec.level })), cr, rec });
+      }
+    }
+    return rows;
+  }
+
+  function sumRows(rows) {
+    let pctSum = 0, pctCr = 0, ptsSum = 0, ptsCr = 0, credits = 0;
+    for (const r of rows) {
+      credits += r.cr;
+      if (r.pct !== null) { pctSum += r.pct * r.cr; pctCr += r.cr; }
+      if (r.pts !== null) { ptsSum += r.pts * r.cr; ptsCr += r.cr; }
+    }
+    return { percent: pctCr > 0 ? pctSum / pctCr : null, points: ptsCr > 0 ? ptsSum / ptsCr : null, credits, count: rows.length };
+  }
+
+  /** Credit-weighted result over the archive alone. */
+  function archiveCumulative(archive, scale, opts) {
+    return sumRows(archiveRows(archive, scale, opts));
+  }
+
+  /** Current courses and the archive together. With an empty archive this equals cumulative(). */
+  function cumulativeAll(courses, archive, scale, opts) {
+    const rows = archiveRows(archive, scale, opts);
+    for (const course of courses || []) {
+      const g = courseGrade(course).percent;
+      const cr = creditsOf(course);
+      if (g === null || cr <= 0) continue;
+      rows.push({ pct: g, pts: pointsFor(g, scale, Object.assign({}, opts, { level: course.level })), cr });
+    }
+    return sumRows(rows);
+  }
+
+  /** One summary per archive period (for example "Grade 9"), oldest first. Used by the trend chart. */
+  function archivePeriods(archive, scale, opts) {
+    const groups = [];
+    const byKey = {};
+    archiveRows(archive, scale, opts).forEach((r, idx) => {
+      const name = String(r.rec.period || '').trim() || 'Earlier';
+      if (!byKey[name]) { byKey[name] = { name, rows: [], when: '', first: idx }; groups.push(byKey[name]); }
+      const g = byKey[name];
+      g.rows.push(r);
+      const w = String(r.rec.when || '');
+      if (w && (!g.when || w < g.when)) g.when = w;
+    });
+    groups.sort((a, b) => (a.when && b.when ? a.when.localeCompare(b.when) || a.first - b.first : a.when ? -1 : b.when ? 1 : a.first - b.first));
+    return groups.map((g) => Object.assign({ name: g.name, when: g.when }, sumRows(g.rows))).filter((g) => g.percent !== null);
+  }
+
   // ---------------------------------------------------- "What do I need?"
 
   function hasUpcoming(course) {
@@ -461,6 +602,8 @@
 
   return {
     SCALES, DEFAULT_BONUS, EPS, num, round1, fmt,
+    COUNTRIES, countryById, countryOfScale, scalesOfCountry,
+    archivePercent, archiveRows, archiveCumulative, cumulativeAll, archivePeriods,
     getScale, normalizeBands, hasPoints, bandFor, pointsFor,
     entryPercent, isUpcoming, averageOf, categoryPercents, categoryAverage,
     courseGrade, totalWeight, creditsOf, cumulative, termSummaries, requirementProgress,

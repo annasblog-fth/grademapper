@@ -1,13 +1,13 @@
 {
-  "name": "Little Grades",
-  "short_name": "Little Grades",
+  "name": "grademapper",
+  "short_name": "grademapper",
   "description": "A cute, simple grade tracker that tells you what you need on your next test.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#FBF7E8",
-  "theme_color": "#660033",
+  "background_color": "#F7F4EA",
+  "theme_color": "#111111",
   "categories": ["education", "productivity"],
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },

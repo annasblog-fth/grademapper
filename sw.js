@@ -1,16 +1,19 @@
-/* Little Grades service worker: makes the app open offline.
+/* grademapper service worker: makes the app open offline.
    Change VERSION whenever you change any app file, so phones pick up the update. */
-const VERSION = 'lg-v1';
+const VERSION = 'gm-v2';
 const SHELL = [
   './', 'index.html', 'privacy.html', 'manifest.webmanifest', 'css/styles.css',
   'js/engine.js', 'js/util.js', 'js/themes.js', 'js/store.js', 'js/ui.js', 'js/app.js',
   'js/pages/grades.js', 'js/pages/welcome.js', 'js/pages/home.js', 'js/pages/activities.js',
-  'js/pages/calendar.js', 'js/pages/tools.js', 'js/pages/tools-media.js', 'js/pages/settings.js',
+  'js/pages/calendar.js', 'js/pages/tools.js', 'js/pages/tools-media.js', 'js/pages/archive.js', 'js/pages/settings.js', 'js/dock.js',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png',
 ];
 
+// Real recordings (optional). Each is saved on its own, so a missing file never stops the app from installing.
+const AUDIO = ['audio/rain.mp3', 'audio/ocean.mp3', 'audio/forest.mp3'];
+
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL).then(() => Promise.all(AUDIO.map((a) => c.add(a).catch(() => null))))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {

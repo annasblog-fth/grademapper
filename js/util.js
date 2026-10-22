@@ -1,4 +1,4 @@
-/* Little Grades: small helpers (DOM, dates, colours, icons, downloads). */
+/* grademapper: small helpers (DOM, dates, colours, icons, downloads). */
 (function () {
   'use strict';
   const LG = (window.LG = window.LG || {});
@@ -135,6 +135,7 @@
     calendar: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',
     tools: '<path d="M14.5 6.5a4 4 0 005 5L12 19l-4-4 6.5-8.5z"/><path d="M5 19l3-3"/>',
     me: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>',
+    archive: '<path d="M4 7h16v4H4z"/><path d="M6 11v9h12v-9"/><path d="M10 15h4"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
     x: '<path d="M6 6l12 12M18 6L6 18"/>',
     check: '<path d="M5 12.5l4.5 4.5L19 7"/>',
@@ -174,12 +175,12 @@
   u.makeICS = (events) => {
     const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
     const esc = (s) => String(s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
-    const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Little Grades//EN', 'CALSCALE:GREGORIAN'];
+    const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//grademapper//EN', 'CALSCALE:GREGORIAN'];
     for (const e of events) {
       const d = u.parseISO(e.due);
       if (!d) continue;
       const ymd = e.due.replace(/-/g, '');
-      lines.push('BEGIN:VEVENT', 'UID:' + e.id + '@little-grades', 'DTSTAMP:' + stamp);
+      lines.push('BEGIN:VEVENT', 'UID:' + e.id + '@grademapper', 'DTSTAMP:' + stamp);
       const t = /^(\d{2}):(\d{2})$/.exec(e.time || '');
       if (t) {
         const hhmm = t[1] + t[2] + '00';

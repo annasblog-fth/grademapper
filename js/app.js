@@ -1,4 +1,4 @@
-/* Little Grades: app shell (router, navigation, lock screen, reminders, printing, start-up). */
+/* grademapper: app shell (router, navigation, lock screen, reminders, printing, start-up). */
 (function () {
   'use strict';
   const LG = window.LG;
@@ -9,17 +9,18 @@
     { id: 'grades', label: 'Grades', icon: 'grades' },
     { id: 'activities', label: 'Activities', icon: 'activities' },
     { id: 'calendar', label: 'Calendar', icon: 'calendar' },
-    { id: 'tools', label: 'Tools', icon: 'tools' },
     { id: 'settings', label: 'Settings', icon: 'me' },
   ];
   const ROUTES = {
     home: () => LG.pages.home, grades: () => LG.pages.grades, activities: () => LG.pages.activities,
-    calendar: () => LG.pages.calendar, tools: () => LG.pages.tools, settings: () => LG.pages.settings,
-    learn: () => LG.pages.learn, welcome: () => LG.pages.welcome,
+    calendar: () => LG.pages.calendar, settings: () => LG.pages.settings,
+    learn: () => LG.pages.learn, welcome: () => LG.pages.welcome, archive: () => LG.pages.archive,
   };
-  const NAV_FOR = { learn: 'home', welcome: 'home' };
+  const NAV_FOR = { learn: 'home', welcome: 'home', archive: 'grades' };
+  const NAME = 'grademapper';
 
-  const app = (LG.app = { flag: null, current: null });
+  const app = (LG.app = { flag: null, current: null, name: NAME, version: '2.0.0' });
+  let lastHash = null;      // the last page shown, so opening Tools never moves the person off their page
   let currentPage = null;
 
   function parseHash() {
@@ -39,17 +40,64 @@
     });
   }
 
-  function render(keepScroll) {
+  // Where the cursor was, so it can be put back after the page redraws (keyboard and screen-reader users).
+  function focusSpot(root, which) {
+    const el = which || document.activeElement;
+    if (!el || el === document.body || el === root || !root.contains(el)) return null;
+    if (el.id) return { id: el.id };
+    const path = [];
+    for (let n = el; n && n !== root; n = n.parentElement) path.unshift(Array.prototype.indexOf.call(n.parentElement.children, n));
+    return { path, tag: el.tagName };
+  }
+  // The thing the person just pressed, and where it was on screen. After the page redraws, the page is nudged so that
+  // thing sits at the same spot (a theme change can make the content above it taller or shorter).
+  let anchor = null;
+  document.addEventListener('click', (e) => {
+    const el = e.target && e.target.closest ? e.target.closest('button, a, input, select, label, summary') : null;
+    const view = u.$('#view');
+    anchor = el && view && view.contains(el) ? { spot: focusSpot(view, el), top: el.getBoundingClientRect().top, at: Date.now() } : null;
+  }, true);
+  function findSpot(root, spot) {
+    let el = null;
+    if (spot.id) el = document.getElementById(spot.id);
+    else { el = root; for (let i = 0; i < spot.path.length && el; i++) el = el.children[spot.path[i]]; if (el && el.tagName !== spot.tag) el = null; }
+    return el && root.contains(el) ? el : null;
+  }
+  function restoreFocus(root, spot) {
+    if (!spot) return;
+    const el = findSpot(root, spot);
+    if (el && root.contains(el) && typeof el.focus === 'function') { try { el.focus({ preventScroll: true }); } catch (e) { /* ignore */ } }
+  }
+
+  /**
+   * mode: 'nav' = the person went to a page (start at the top),
+   *       'keep' = the same page was redrawn after a change (stay exactly where they were scrolled),
+   *       'top' = the same page, but start again from the top (the welcome steps).
+   */
+  function render(mode) {
     if (store.locked) { showLock(); return; }
     let { name, params } = parseHash();
     if (!name) name = store.state.profile.onboarded ? 'home' : 'welcome';
+    if (name === 'tools') {
+      // Tools is a panel in the top-right corner now. Old links and bookmarks still work: open the panel, stay put.
+      const back = lastHash || '#/home';
+      try { history.replaceState(null, '', location.pathname + location.search + back); } catch (e) { location.hash = back; }
+      if (app.current) { LG.dock.open(params[0] || null); return; }
+      render('nav'); LG.dock.open(params[0] || null); return;
+    }
     if (!ROUTES[name]) name = 'home';
+    lastHash = '#/' + [name].concat(params).join('/');
     const page = ROUTES[name]();
-    // A fresh element each time, so event listeners from the previous page never pile up.
+    // Read the scroll position BEFORE the page is replaced. (Reading it afterwards gives 0 and sends the person to the top.)
+    const y = window.scrollY;
     const oldView = u.$('#view');
+    const routeKey = name + '/' + params.join('/');
+    const same = oldView.dataset.route === routeKey;
+    const keep = mode === 'keep' || (same && mode !== 'top' && mode !== 'nav');
+    const spot = keep ? focusSpot(oldView) : null;
+    // A fresh element each time, so event listeners from the previous page never pile up.
     const view = oldView.cloneNode(false);
     oldView.replaceWith(view);
-    const y = window.scrollY;
 
     if (currentPage && currentPage.leave) currentPage.leave();
     currentPage = page;
@@ -57,9 +105,9 @@
     document.body.dataset.page = name;
     u.$('#shell').hidden = false;
     u.$('#lock').hidden = true;
-    const fresh = view.dataset.route !== name + '/' + params.join('/');
     view.innerHTML = '';
-    view.dataset.route = name + '/' + params.join('/');
+    view.dataset.route = routeKey;
+    if (keep) view.dataset.still = '1'; else delete view.dataset.still;   // a redraw after a change should not replay the entrance animation
     try {
       page.render(view, params);
     } catch (err) {
@@ -67,19 +115,25 @@
       view.innerHTML = '<div class="empty"><p>Something went wrong showing this page.</p><p class="muted">Your data is safe. Try going home.</p><a class="btn primary" href="#/home">Go home</a></div>';
     }
     setNav(name);
-    document.title = (page.title ? page.title + ' · ' : '') + 'Little Grades';
+    document.title = (page.title ? page.title + ' · ' : '') + NAME;
     const h1 = u.$('h1', view);
-    if (keepScroll) window.scrollTo(0, y);
-    else {
-      window.scrollTo(0, 0);
-      if (fresh && h1 && !u.$('dialog[open]')) { h1.setAttribute('tabindex', '-1'); h1.focus({ preventScroll: true }); }
-    }
     ui.enhance(view);
-    paintTimerPill();
+    if (keep) {
+      window.scrollTo(0, y);
+      restoreFocus(view, spot);
+      if (anchor && anchor.spot && Date.now() - anchor.at < 2500) {
+        const el = findSpot(view, anchor.spot);
+        if (el) { const d = el.getBoundingClientRect().top - anchor.top; if (Math.abs(d) > 1) window.scrollBy(0, d); }
+      }
+    } else {
+      window.scrollTo(0, 0);
+      if (!same && h1 && !u.$('dialog[open]')) { h1.setAttribute('tabindex', '-1'); h1.focus({ preventScroll: true }); }
+    }
   }
-  app.rerender = (keepScroll) => render(!!keepScroll);
+  // rerender() keeps the scroll position. rerender(false) starts from the top again.
+  app.rerender = (keepScroll) => render(keepScroll === false ? 'top' : 'keep');
 
-  window.addEventListener('hashchange', () => render(false));
+  window.addEventListener('hashchange', () => render('nav'));
 
   // ---------------------------------------------------------- lock screen
   function showLock() {
@@ -99,24 +153,14 @@
       e.preventDefault();
       const err = u.$('#lock-err', box);
       err.textContent = 'Checking...';
-      try { await store.unlock(input.value); render(false); startReminders(); }
+      try { await store.unlock(input.value); render('nav'); startReminders(); }
       catch (ex) { err.textContent = 'That passphrase did not work. Try again.'; input.select(); }
     });
     u.$('#lock-wipe', box).addEventListener('click', async () => {
       const ok = await ui.confirm({ title: 'Delete everything?', body: 'This erases the locked data from this device for good.', confirmLabel: 'Delete everything', danger: true });
       if (!ok) return;
-      store.wipe(); LG.pages.welcome.restart(); location.hash = '#/welcome'; render(false); startReminders();
+      store.wipe(); LG.pages.welcome.restart(); location.hash = '#/welcome'; render('nav'); startReminders();
     });
-  }
-
-  // -------------------------------------------------------- timer pill
-  function paintTimerPill() {
-    const pill = u.$('#timer-pill');
-    const T = LG.tools && LG.tools.timer;
-    if (!pill || !T) return;
-    const show = T.running && !(app.current === 'tools' && parseHash().params[0] === 'timer');
-    pill.hidden = !show;
-    if (show) pill.innerHTML = u.icon('clock') + '<span>' + u.esc(T.phaseLabel()) + ' ' + u.esc(T.label()) + '</span>';
   }
 
   // ------------------------------------------------------------ reminders
@@ -136,7 +180,7 @@
         const aim = e.need.status === 'reachable' ? ' Aim for about ' + E.fmt(e.need.needed) + '%.' : '';
         const msg = e.courseName + ': ' + (e.name || 'item') + ' ' + u.relDay(e.due).toLowerCase() + ', worth ' + E.fmt(e.worth) + '%.' + aim;
         ui.toast(msg, { ms: 15000 });
-        try { if ('Notification' in window && Notification.permission === 'granted') new Notification('Little Grades', { body: msg, icon: 'icons/icon-192.png' }); } catch (err) { /* ignore */ }
+        try { if ('Notification' in window && Notification.permission === 'granted') new Notification(NAME, { body: msg, icon: 'icons/icon-192.png' }); } catch (err) { /* ignore */ }
       }
     });
     if (changed) {
@@ -188,14 +232,13 @@
       if (what === 'save-error') ui.toast('Could not save. Your browser storage may be full or blocked. Download a backup to be safe.', { ms: 12000 });
       if (what === 'wiped' || what === 'imported') startReminders();
     });
-    LG.tools.timer.on(paintTimerPill);
-    u.$('#timer-pill').addEventListener('click', () => { location.hash = '#/tools/timer'; });
+    LG.dock.init();
     if (!r.locked) {
       const s = store.state;
       if (!s.prefs.termId) s.prefs.termId = s.terms[s.terms.length - 1].id;
       startReminders();
     }
-    render(false);
+    render('nav');
     if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
       navigator.serviceWorker.register('sw.js').catch(() => { /* offline mode is a bonus, not a must */ });
     }

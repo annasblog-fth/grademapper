@@ -1,9 +1,10 @@
 /*
- * Little Grades: storage.
+ * grademapper: storage.
  *
  * Everything lives in this browser (localStorage). Nothing is sent anywhere.
  * Two keys:
  *   - appearance (theme, colours, fonts): always plain, so the lock screen can look right.
+ *   The storage names below still say 'little-grades' on purpose: keeping them means everything saved by version 1 opens in version 2.
  *   - data (profile, courses, notes...): plain, or encrypted with a passphrase (AES-256-GCM,
  *     key made with PBKDF2). The passphrase is never stored. Forget it and the data is gone.
  */
@@ -57,7 +58,7 @@
   function defaultState() {
     return {
       v: 2,
-      profile: { name: '', grade: '', region: 'us', goal: '', colleges: [], onboarded: false },
+      profile: { name: '', grade: '', region: 'us', country: '', goal: '', colleges: [], onboarded: false },
       prefs: {
         weighted: false,
         bonus: { regular: 0, honors: 0.5, ap: 1, ib: 1 },
@@ -80,6 +81,7 @@
       courses: [],
       activities: [],
       notes: [],
+      archive: [],          // earlier classes, grades and GPA added by hand (version 2)
       reminded: {},
     };
   }
@@ -94,9 +96,11 @@
     out.prefs.bonus = Object.assign({}, d.prefs.bonus, (data.prefs || {}).bonus);
     out.prefs.customScale = Object.assign({}, d.prefs.customScale, (data.prefs || {}).customScale);
     ['colleges'].forEach((k) => { if (!Array.isArray(out.profile[k])) out.profile[k] = []; });
-    ['terms', 'courses', 'activities', 'notes'].forEach((k) => { if (!Array.isArray(out[k])) out[k] = []; });
+    ['terms', 'courses', 'activities', 'notes', 'archive'].forEach((k) => { if (!Array.isArray(out[k])) out[k] = []; });
     if (out.terms.length === 0) out.terms = d.terms;
     if (!out.reminded || typeof out.reminded !== 'object') out.reminded = {};
+    // Version 1 saves have no country. Work it out from the grading scale they already picked.
+    if (!out.profile.country) out.profile.country = LG.E.countryOfScale(out.profile.region).id;
     out.v = 2;
     return out;
   }
@@ -229,7 +233,7 @@
 
   // ---- backup files
   store.exportBackup = async (pass) => {
-    const body = { app: 'little-grades', v: 2, exported: new Date().toISOString() };
+    const body = { app: 'grademapper', v: 2, exported: new Date().toISOString() };
     const payload = { state: store.state, appearance: store.appearance };
     if (pass) {
       if (!canEncrypt) throw new Error('This browser cannot encrypt here.');
@@ -242,8 +246,9 @@
   /** Returns { needsPassphrase: true } for encrypted files without a passphrase. */
   store.importBackup = async (text, pass) => {
     let file;
-    try { file = JSON.parse(text); } catch (e) { throw new Error('That file is not a Little Grades backup.'); }
-    if (!file || file.app !== 'little-grades') throw new Error('That file is not a Little Grades backup.');
+    try { file = JSON.parse(text); } catch (e) { throw new Error('That file is not a grademapper backup.'); }
+    // Backups made by version 1 say 'little-grades'. Both are accepted.
+    if (!file || (file.app !== 'grademapper' && file.app !== 'little-grades')) throw new Error('That file is not a grademapper backup.');
     let payload = file.payload;
     if (file.enc) {
       if (!pass) return { needsPassphrase: true };

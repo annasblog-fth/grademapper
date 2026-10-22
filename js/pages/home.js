@@ -1,4 +1,4 @@
-/* Little Grades: home (a calm overview with a daily word from Pip). */
+/* grademapper: home (a calm overview with a daily word from Pip). */
 (function () {
   'use strict';
   const LG = window.LG;
@@ -53,6 +53,7 @@
     const termCourses = s.courses.filter((c) => c.termId === term.id);
     const sum = E.cumulative(termCourses, scale, opts);
     const all = E.cumulative(s.courses, scale, opts);
+    const allTime = s.archive.length ? E.cumulativeAll(s.courses, s.archive, scale, opts) : null;
     const events = E.collectEvents(s.courses, p.goal).filter((e) => !e.scored);
     const upcoming = events.filter((e) => e.due >= today);
     const pastDue = events.filter((e) => e.due < today);
@@ -76,6 +77,7 @@
         (hasPts && sum.points !== null ? '<span class="chip"><small>' + u.esc(ptsLabel) + '</small>' + sum.points.toFixed(2) + '</span>' : '') + '</div></div>' +
         '<div data-meter>' + ui.meterHTML() + '</div>' +
         (s.terms.length > 1 && all.percent !== null ? '<p class="muted">All terms together: <strong>' + E.fmt(all.percent) + '%</strong>' + (hasPts && all.points !== null ? ' &middot; cumulative ' + u.esc(ptsLabel) + ' <strong>' + all.points.toFixed(2) + '</strong>' : '') + '</p>' : '') +
+        (s.archive.length && allTime.percent !== null ? '<p class="muted">With your archive: <strong>' + E.fmt(allTime.percent) + '%</strong>' + (hasPts && allTime.points !== null ? ' &middot; all-time ' + u.esc(ptsLabel) + ' <strong>' + allTime.points.toFixed(2) + '</strong>' : '') + ' <a href="#/archive">Open the archive</a></p>' : '') +
         (hasPts && scale.allowsBonus ? '<p class="hint">Showing ' + (s.prefs.weighted ? 'weighted' : 'unweighted') + ' ' + u.esc(ptsLabel) + '. Change it on the Grades page.</p>' : '');
 
     const heads = hard.length
@@ -113,6 +115,7 @@
       '<a class="shortcut" href="#/tools/timer">' + u.icon('clock') + 'Focus timer</a>' +
       '<a class="shortcut" href="#/tools/notes">' + u.icon('note') + 'Notes</a>' +
       '<a class="shortcut" href="#/learn">' + u.icon('sparkle') + 'How grades work</a>' +
+      '<a class="shortcut" href="#/archive">' + u.icon('archive') + 'Archive</a>' +
       '<a class="shortcut" href="#/activities">' + u.icon('activities') + 'Activities</a></div></section>';
 
     if (sum.percent !== null) ui.updateMeter(u.$('[data-meter] .meter', view), { cur: sum.percent, goal });

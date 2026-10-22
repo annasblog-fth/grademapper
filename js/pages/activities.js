@@ -1,4 +1,4 @@
-/* Little Grades: activities (volunteering, sports, clubs) and college course requirements. */
+/* grademapper: activities (volunteering, sports, clubs) and college course requirements. */
 (function () {
   'use strict';
   const LG = window.LG;

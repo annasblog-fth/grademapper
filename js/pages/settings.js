@@ -1,4 +1,4 @@
-/* Little Grades: settings (look and feel, grading scale, privacy and backup). */
+/* grademapper: settings (look and feel, grading scale, privacy and backup). */
 (function () {
   'use strict';
   const LG = window.LG;
@@ -24,6 +24,12 @@
         rows.push([term ? term.name : '', c.name, k.name, k.weight, e.name, e.score, e.max, p === null ? '' : E.round1(p), e.due || '']);
       }));
     });
+    // Archived classes and summaries (version 2). Nothing is added when the archive is empty.
+    const scale = store.scale();
+    (s.archive || []).forEach((r) => {
+      const pct = r.kind === 'summary' ? E.num(r.percent) : E.archivePercent(r, scale);
+      rows.push(['Archive: ' + (r.period || 'Earlier'), r.kind === 'summary' ? (r.label || 'Summary') + (r.gpa ? ' (GPA ' + r.gpa + ')' : '') : r.name, '(archived)', '', '', '', '', pct === null ? '' : E.round1(pct), '']);
+    });
     return rows.map((r) => r.map(csvCell).join(',')).join('\r\n');
   }
 
@@ -40,6 +46,8 @@
     const s = store.state, a = store.appearance, p = s.profile;
     const themeHasBoth = !!(LG.theme.themeById(a.theme).light && LG.theme.themeById(a.theme).dark);
     const cust = s.prefs.customScale;
+    // The country comes first and the scale is one of that country's scales. Older saves work it out from the scale.
+    const country = E.countryOfScale(p.region);
     const fontOpts = [['theme', 'Theme font']].concat(LG.theme.FONTS.map((f) => [f.id, f.name]));
 
     view.innerHTML =
@@ -60,16 +68,18 @@
       seg('st-cards', 'Cards', [['outline', 'Outlined'], ['flat', 'Flat'], ['lifted', 'Lifted']], a.cards) +
       seg('st-density', 'Spacing', [['cozy', 'Cozy'], ['compact', 'Compact']], a.density) +
       seg('st-anim', 'Animations', [['playful', 'Playful'], ['calm', 'Calm'], ['off', 'Off']], a.anim, 'Animations also turn off if your phone is set to reduce motion.') +
-      '<div class="field"><label class="lbl" for="st-scale">Text size <output id="st-scale-out">' + Math.round(a.scale * 100) + '%</output></label><input type="range" id="st-scale" min="0.85" max="1.6" step="0.05" value="' + a.scale + '"></div>' +
+      '<div class="field"><label class="lbl" for="st-scale">Text size <output id="st-scale-out">' + Math.round(a.scale * 100) + '%</output></label><input type="range" id="st-scale" min="0.85" max="1.3" step="0.05" value="' + a.scale + '"></div>' +
       '<label class="check" for="st-hc"><input type="checkbox" id="st-hc"' + (a.contrast ? ' checked' : '') + '><span>High contrast</span></label>' +
       '<label class="check" for="st-dys"><input type="checkbox" id="st-dys"' + (a.dys ? ' checked' : '') + '><span>Dyslexia-friendly font and spacing</span></label>' +
       '<button type="button" class="btn quiet" id="st-reset-look">Reset the look to Standard</button></section>' +
 
       '<section class="card" aria-labelledby="gr-h"><h2 id="gr-h">Grading</h2>' +
-      '<div class="field"><label class="lbl" for="gr-region">Grading scale</label><select class="in" id="gr-region">' +
-      ui.options(Object.keys(E.SCALES).map((k) => ({ value: k, label: E.SCALES[k].label })).concat([{ value: 'custom', label: 'My own scale' }]), p.region) + '</select></div>' +
+      '<div class="field"><label class="lbl" for="gr-country">Country</label><select class="in" id="gr-country">' +
+      ui.options(E.COUNTRIES.map((c) => ({ value: c.id, label: c.name })), country.id) + '</select></div>' +
+      '<div class="field"><label class="lbl" for="gr-region">Grading scale in ' + u.esc(country.name) + '</label><select class="in" id="gr-region">' +
+      ui.options(E.scalesOfCountry(country.id).map((x) => ({ value: x.id, label: x.label })), p.region) + '</select></div>' +
       (E.getScale(p.region, cust).note ? '<p class="hint">' + u.esc(E.getScale(p.region, cust).note) + '</p>' : '') +
-      '<p class="hint">Schools differ. If your cut-offs are not the same, choose "My own scale" and enter them.</p>' +
+      '<p class="hint">Schools differ. If your cut-offs are not the same, pick "Somewhere else, or my own scale" as the country and enter them.</p>' +
       (p.region === 'custom'
         ? '<div class="sub-panel open"><h3>My own scale</h3><div class="field"><label class="lbl" for="cs-pl">Name for the points (leave blank if none)</label><input class="in" id="cs-pl" value="' + u.esc(cust.pointsLabel) + '" placeholder="GPA"></div>' +
           '<label class="check" for="cs-bonus"><input type="checkbox" id="cs-bonus"' + (cust.bonus ? ' checked' : '') + '><span>Allow weighted bonus points (honors, AP, IB)</span></label>' +
@@ -90,7 +100,7 @@
       '<div class="stack-sm"><h3>Export</h3><div class="row-wrap"><button type="button" class="btn" id="pv-csv">' + u.icon('download') + ' Grades as CSV</button><button type="button" class="btn" id="pv-print">Print or save as PDF</button></div></div>' +
       '<div class="stack-sm danger-zone"><h3>Delete everything</h3><p class="muted">Removes every course, score, note and setting from this device in one tap.</p><button type="button" class="btn danger" id="pv-wipe">' + u.icon('trash') + ' Delete everything</button></div></section>' +
 
-      '<section class="card" aria-labelledby="ab-h"><h2 id="ab-h">About</h2><p>Little Grades helps you see where you stand and what you need next. Numbers are only as good as what you type in, and your school\'s rules always win.</p>' +
+      '<section class="card" aria-labelledby="ab-h"><h2 id="ab-h">About</h2><p>grademapper helps you see where you stand and what you need next. Numbers are only as good as what you type in, and your school\'s rules always win.</p><p class="hint">Version ' + u.esc(LG.app.version) + '</p>' +
       '<div class="row-wrap"><button type="button" class="btn" id="ab-welcome">Run the welcome setup again</button><a class="btn" href="#/learn">How grades work</a><a class="btn" href="privacy.html">Privacy policy</a></div></section>';
 
     // ------------------------------------------------ appearance wiring
@@ -121,7 +131,13 @@
     u.$('#st-reset-look', view).addEventListener('click', () => { store.setAppearance(Object.assign({}, LG.theme.DEFAULT_APPEARANCE)); LG.app.rerender(true); ui.toast('Back to the Standard look.'); });
 
     // ----------------------------------------------------- grading wiring
-    u.$('#gr-region', view).addEventListener('change', (e) => { p.region = e.target.value; store.save(); LG.app.rerender(true); });
+    u.$('#gr-country', view).addEventListener('change', (e) => {
+      const c = E.countryById(e.target.value); if (!c) return;
+      p.country = c.id;
+      if (c.scales.indexOf(p.region) < 0) p.region = c.scales[0];
+      store.save(); LG.app.rerender(true);
+    });
+    u.$('#gr-region', view).addEventListener('change', (e) => { p.region = e.target.value; p.country = E.countryOfScale(p.region).id; store.save(); LG.app.rerender(true); });
     u.$$('[data-bonus]', view).forEach((i) => i.addEventListener('input', () => { s.prefs.bonus[i.dataset.bonus] = i.value; store.save(); }));
     if (p.region === 'custom') {
       u.$('#cs-pl', view).addEventListener('input', (e) => { cust.pointsLabel = e.target.value; store.save(); });
@@ -182,7 +198,7 @@
         if (enc === 'enc') { pass = await askPass('Backup passphrase', true); if (!pass) return; }
       }
       try {
-        u.download('little-grades-backup-' + u.todayISO() + '.json', await store.exportBackup(pass), 'application/json');
+        u.download('grademapper-backup-' + u.todayISO() + '.json', await store.exportBackup(pass), 'application/json');
         ui.toast('Backup saved. Keep it somewhere safe.');
       } catch (err) { ui.toast(err.message); }
     });
@@ -204,7 +220,7 @@
       } catch (err) { ui.toast(err.message); }
       fileIn.value = '';
     });
-    u.$('#pv-csv', view).addEventListener('click', () => { u.download('little-grades-' + u.todayISO() + '.csv', '﻿' + buildCSV(), 'text/csv;charset=utf-8'); ui.toast('CSV saved. It opens in Excel, Sheets or Numbers.'); });
+    u.$('#pv-csv', view).addEventListener('click', () => { u.download('grademapper-' + u.todayISO() + '.csv', '﻿' + buildCSV(), 'text/csv;charset=utf-8'); ui.toast('CSV saved. It opens in Excel, Sheets or Numbers.'); });
     u.$('#pv-print', view).addEventListener('click', () => { LG.app.printSummary(); });
     u.$('#pv-wipe', view).addEventListener('click', async () => {
       const ok = await ui.modal({ title: 'Delete everything?', html: '<p>All courses, scores, activities, notes and settings will be erased from this device. This cannot be undone. A backup file you saved earlier will still work.</p>', actions: [{ label: 'Keep my data', kind: 'primary', value: false }, { label: 'Delete everything', kind: 'danger', value: true }] });

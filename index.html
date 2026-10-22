@@ -3,16 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Little Grades</title>
-  <meta name="description" content="A cute, simple grade tracker that tells you what you need on your next test. Works offline. No account.">
-  <meta name="theme-color" content="#FBF7E8">
+  <title>grademapper</title>
+  <meta name="description" content="grademapper: a cute, simple grade tracker that tells you what you need on your next test. Works offline. No account.">
+  <meta name="theme-color" content="#F7F4EA">
   <meta name="color-scheme" content="light dark">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Little Grades">
+  <meta name="apple-mobile-web-app-title" content="grademapper">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif:wght@400;500;600;700&display=swap">
@@ -22,28 +22,30 @@
 <body>
   <a class="skip" href="#view">Skip to content</a>
 
-  <!-- Falling petals, shown only by the Pink Flowey theme -->
-  <div id="fx" aria-hidden="true">
-    <i style="--x:6%;--d:15s;--w:-2s;--dx:8vw"></i><i style="--x:18%;--d:19s;--w:-9s;--dx:-5vw"></i>
-    <i style="--x:30%;--d:13s;--w:-5s;--dx:6vw"></i><i style="--x:42%;--d:17s;--w:-12s;--dx:-8vw"></i>
-    <i style="--x:55%;--d:16s;--w:-1s;--dx:5vw"></i><i style="--x:66%;--d:20s;--w:-7s;--dx:-6vw"></i>
-    <i style="--x:77%;--d:14s;--w:-10s;--dx:7vw"></i><i style="--x:88%;--d:18s;--w:-4s;--dx:-4vw"></i>
-    <i style="--x:95%;--d:21s;--w:-14s;--dx:-7vw"></i><i style="--x:12%;--d:22s;--w:-17s;--dx:5vw"></i>
-  </div>
-
   <div id="shell" hidden>
     <header class="topbar">
-      <a class="brand" href="#/home"><span class="logo" aria-hidden="true">LG</span><span>Little Grades</span></a>
-      <button type="button" id="timer-pill" hidden aria-label="Timer is running. Open the timer."></button>
+      <a class="brand" href="#/home"><span class="logo" aria-hidden="true">GM</span><span>grademapper</span></a>
+      <button type="button" id="tools-btn" class="tools-btn" aria-expanded="false" aria-controls="tools-panel"><span>Tools</span></button>
     </header>
+    <!-- Tools panel: top-right, floats above whichever page is open -->
+    <section id="tools-panel" class="tools-panel" role="region" aria-labelledby="tools-title" hidden>
+      <div class="panel-head">
+        <button type="button" id="tools-back" class="panel-btn" hidden></button>
+        <h2 id="tools-title" tabindex="-1">Tools</h2>
+        <button type="button" id="tools-close" class="panel-btn"></button>
+      </div>
+      <div id="tools-body" class="panel-body"></div>
+    </section>
     <main id="main"><div id="view" tabindex="-1"></div></main>
     <nav id="nav" aria-label="Main"></nav>
+    <!-- Small popup shown while a tool is in use (timer, sound, recording, reading aloud) -->
+    <div id="tool-popup" class="tool-popup" role="region" aria-label="Tools in use" hidden></div>
   </div>
 
   <div id="lock" hidden></div>
   <div id="toast" role="status" aria-live="polite" hidden></div>
 
-  <noscript><p style="padding:1rem">Little Grades needs JavaScript to run. Please turn it on in your browser.</p></noscript>
+  <noscript><p style="padding:1rem">grademapper needs JavaScript to run. Please turn it on in your browser.</p></noscript>
 
   <script src="js/engine.js"></script>
   <script src="js/util.js"></script>
@@ -57,7 +59,9 @@
   <script src="js/pages/calendar.js"></script>
   <script src="js/pages/tools.js"></script>
   <script src="js/pages/tools-media.js"></script>
+  <script src="js/pages/archive.js"></script>
   <script src="js/pages/settings.js"></script>
+  <script src="js/dock.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

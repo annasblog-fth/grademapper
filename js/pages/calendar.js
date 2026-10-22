@@ -1,4 +1,4 @@
-/* Little Grades: calendar (upcoming tests, what they are worth, what to aim for, reminders). */
+/* grademapper: calendar (upcoming tests, what they are worth, what to aim for, reminders). */
 (function () {
   'use strict';
   const LG = window.LG;
@@ -82,7 +82,7 @@
   async function eventDialog(existing) {
     const s = store.state;
     if (!existing && !s.courses.length) {
-      await ui.modal({ title: 'Add a course first', html: '<p>Tests and assignments belong to a course, so Little Grades can work out what they are worth. Add a course on the Grades page, then come back.</p>', actions: [{ label: 'OK', kind: 'primary', value: true }] });
+      await ui.modal({ title: 'Add a course first', html: '<p>Tests and assignments belong to a course, so grademapper can work out what they are worth. Add a course on the Grades page, then come back.</p>', actions: [{ label: 'OK', kind: 'primary', value: true }] });
       return;
     }
     let course, cat, entry;
@@ -176,7 +176,7 @@
       '<div class="row-between wrap"><button type="button" class="btn primary" data-act="add">' + u.icon('plus') + ' Add a test or assignment</button>' +
       '<div class="seg" id="mode-seg" role="group" aria-label="Calendar view"><button type="button" data-v="list" aria-pressed="' + (mode === 'list') + '">' + u.icon('list') + ' List</button><button type="button" data-v="month" aria-pressed="' + (mode === 'month') + '">' + u.icon('grid') + ' Month</button></div></div>' +
       '<section class="card remind" aria-labelledby="rm-h"><h2 id="rm-h">Reminders</h2>' +
-      (on ? '<p>' + u.icon('bell', 'inline') + 'Reminders are on. ' + (perm === 'granted' ? 'You will get a notification while Little Grades is open.' : perm === 'denied' ? 'Notifications are blocked in your browser, so reminders show inside the app.' : 'Reminders show inside the app.') + '</p>' : '<p class="muted">Get a nudge before a test, with what to aim for.</p>') +
+      (on ? '<p>' + u.icon('bell', 'inline') + 'Reminders are on. ' + (perm === 'granted' ? 'You will get a notification while grademapper is open.' : perm === 'denied' ? 'Notifications are blocked in your browser, so reminders show inside the app.' : 'Reminders show inside the app.') + '</p>' : '<p class="muted">Get a nudge before a test, with what to aim for.</p>') +
       '<div class="row-wrap">' + (on ? '<button type="button" class="btn" data-act="remind-off">Turn reminders off</button>' : '<button type="button" class="btn primary" data-act="remind-on">' + u.icon('bell') + ' Turn on reminders</button>') +
       '<button type="button" class="btn" data-act="ics">' + u.icon('download') + ' Add to my phone calendar</button></div>' +
       '<p class="hint">A website can only remind you while it is open. For reminders when it is closed, download the calendar file and open it on your phone. Your phone\'s own calendar app will then do the reminding.</p></section>' +
@@ -206,7 +206,7 @@
       else if (act === 'ics') {
         const list = events.filter((x) => !x.scored && x.due >= u.todayISO());
         if (!list.length) { ui.toast('Nothing upcoming to export yet.'); return; }
-        u.download('little-grades-calendar.ics', u.makeICS(list), 'text/calendar;charset=utf-8');
+        u.download('grademapper-calendar.ics', u.makeICS(list), 'text/calendar;charset=utf-8');
         ui.toast('Calendar file saved. Open it on your phone to add the dates and reminders.');
       }
     });
